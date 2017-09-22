@@ -11,27 +11,27 @@
 
 // bb is 'bitboard'
 typedef struct gamestate {
-  uint64_t rooks_bb;
-  uint64_t knights_bb;
-  uint64_t bishops_bb;
-  uint64_t queens_bb;
-  uint64_t kings_bb;
-  uint64_t pawns_bb;
-  union {
+  uint64_t rooks_bb;   // 8
+  uint64_t knights_bb; // 16
+  uint64_t bishops_bb; // 24
+  uint64_t queens_bb;  // 32
+  uint64_t kings_bb;   // 40
+  uint64_t pawns_bb;   // 48
+  union {              // 56
     uint64_t current_player_bb;
     uint64_t current_piece_bb; // For iterators
   };
-  int en_passant_sq;
-  union {
+  int64_t en_passant_sq; // 64
+  union { // 72
     uint64_t castle_flags;
     uint64_t promotion_piece; // For iterators
   };
-  bool is_white;
+  int64_t is_white; // 80
 } gamestate;
 
 struct move {
-  int from;
-  int to;
+  int64_t from;
+  int64_t to;
 };
 
 typedef gamestate iterator;
