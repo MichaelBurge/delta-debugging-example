@@ -1,36 +1,29 @@
-#include "chess.c"
+#include "chess.cpp"
 
-void new_game_w(gamestate *g)
-{
-  *g = new_game();
-}
+extern "C" {
 
-void print_fen_w(gamestate *g, char *buffer)
-{
-  print_fen(*g, buffer);
-}
+  void new_game_w(gamestate *g)
+  { *g = new_game(); }
 
-void mkIterator_w(gamestate *g, iterator *i)
-{
-  *i = mkIterator(*g);
-}
+  void print_fen_w(gamestate *g, char *buffer)
+  { print_fen(*g, buffer); }
 
-void advance_iterator_w(gamestate *g, iterator *i, iterator *result)
-{
-  *result = advance_iterator(*g, *i);
-}
+  void mkIterator_w(gamestate *g, iterator *i)
+  { *i = mkIterator(*g); }
 
-uint64_t perft_w(gamestate *g, int depth)
-{
-  return perft(*g, depth);
-}
+  void advance_iterator_w(gamestate *g, iterator *i, iterator *result)
+  { *result = advance_iterator(*g, *i); }
 
-void apply_move_w(gamestate *g, move *m, gamestate *result)
-{
-  *result = apply_Move(*g, *m);
-}
+  uint64_t perft_w(gamestate *g, int depth)
+  { return perft(*g, depth); }
 
-bool is_iterator_finished_w(iterator *i)
-{
-  return is_iterator_finished(*i);
-}
+  void apply_move_w(gamestate *g, move *m, gamestate *result)
+  { *result = apply_move(*g, *m); }
+
+  bool is_iterator_finished_w(iterator *i)
+  { return is_iterator_finished(*i); }
+
+  void dereference_iterator_w(iterator *i, move *m)
+  { *m = dereference_iterator(*i); }
+  
+};

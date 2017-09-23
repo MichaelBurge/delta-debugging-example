@@ -1421,12 +1421,12 @@ private move parse_move(const char* buffer)
 /* } */
 
 // Used when generating pf_apply_move
-extern "C" void custom_main(const char *g_str, const char *m_str, char *g_dest)
-{
-  gamestate g = parse_fen(g_str);
-  move m = parse_move(m_str);
-  if (! g.is_white)
-    m = swap_move(m);
-  gamestate g2 = apply_move(g, m);
-  print_fen(g2, g_dest);
-}
+// extern "C" void custom_main(const char *g_str, const char *m_str, char *g_dest)
+// {
+//   gamestate g = parse_fen(g_str);
+//   move m = parse_move(m_str);
+//   if (! g.is_white)
+//     m = swap_move(m);
+//   gamestate g2 = apply_move(g, m);
+//   print_fen(g2, g_dest);
+// }

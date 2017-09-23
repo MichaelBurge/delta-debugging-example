@@ -2,7 +2,9 @@ module Chess where
 
 import qualified Data.ByteString as BS
 
+import Control.Monad
 import Data.Int
+import Data.List.Split (splitOneOf)
 import Data.Word
 import Foreign.Ptr
 import Foreign.C.Types
@@ -10,7 +12,9 @@ import Foreign.C.String
 import Foreign.Storable
 import Foreign.Marshal.Alloc
 import Foreign.Marshal.Utils
+import GHC.IO.Handle
 import System.IO.Unsafe
+import System.Process
 
 newtype Gamestate = Gamestate BS.ByteString
 newtype Iterator = Iterator BS.ByteString
@@ -34,7 +38,7 @@ instance Storable Move where
 
 instance Storable Iterator where
   sizeOf _ = 80
-  alignment _ = 89
+  alignment _ = 8
   peek ptr = Iterator <$> BS.packCStringLen (castPtr ptr, sizeOf (undefined :: Iterator))
   poke ptr (Iterator bs) = pokeBs ptr bs
 
@@ -59,7 +63,6 @@ mkIterator g = unsafePerformIO $
     poke g_ptr g
     mkIterator_w g_ptr i_ptr
     peek i_ptr
-    
 
 advanceIterator :: Gamestate -> Iterator -> Iterator
 advanceIterator g i = unsafePerformIO $
@@ -100,6 +103,46 @@ dereferenceIterator i = unsafePerformIO $
     poke i_ptr i
     dereferenceIterator_w i_ptr m_ptr
     peek m_ptr
+
+{- Standard output from the "roce38" process looks like:
+Roce version: 0.0380 - Roman's Own Chess Engine
+Copyright (C) 2003-2007 Roman Hartmann, Switzerland. All rights reserved.
+warning: couldn't open Roce.cfg
+
+roce: 
+roce: 
+Perft (3): 8902, Time: 0.001 s
+roce: 
+-}
+
+reference_perft_w :: Gamestate -> Int32 -> IO Word64
+reference_perft_w g d =
+  let commands = [
+        "setboard " ++ printFen g,
+        "perft " ++ show d,
+        "quit"
+        ]
+  in do
+    (Just hin, Just hout, _, ph) <- createProcess $ CreateProcess {
+      cmdspec = RawCommand "./roce38" [],
+      cwd = Nothing, env = Nothing,
+      std_in = CreatePipe, std_out = CreatePipe, std_err = Inherit,
+      close_fds = False, create_group = False,
+      delegate_ctlc = False, detach_console = False,
+      create_new_console = False, new_session = False,
+      child_group = Nothing, child_user = Nothing
+      }
+    forM_ commands $ \command -> do
+      hPutStr hin command
+      hPutChar hin '\n'
+    waitForProcess ph
+    output <- hGetContents hout
+    let perft_line = lines output !! 6
+        perft_word = splitOneOf " ," perft_line !! 2
+        perft = read perft_word
+    return perft
+
+reference_perft g d = unsafePerformIO $ reference_perft_w g d
 
 foreign import ccall unsafe "new_game_w"
     newGame_w :: Ptr Gamestate -> IO ()
