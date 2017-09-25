@@ -566,7 +566,7 @@ private uint64_t valid_king_moves(gamestate g, int idx)
   uint64_t ret =
     bit(move_direction(idx, DIRECTION_EAST)) |
     bit(move_direction(idx, DIRECTION_WEST)) |
-    bit(move_direction(idx, DIRECTION_NORTH)) |
+    // bit(move_direction(idx, DIRECTION_NORTH)) |
     bit(move_direction(idx, DIRECTION_SOUTH)) |
     bit(move_direction(idx, DIRECTION_NORTHEAST)) |
     bit(move_direction(idx, DIRECTION_SOUTHEAST)) |

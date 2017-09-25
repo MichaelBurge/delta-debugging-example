@@ -4,6 +4,7 @@ import qualified Data.ByteString as BS
 
 import Control.Monad
 import Data.Int
+import Data.IORef
 import Data.List.Split (splitOneOf)
 import Data.Word
 import Foreign.Ptr
@@ -16,9 +17,37 @@ import GHC.IO.Handle
 import System.IO.Unsafe
 import System.Process
 
+type Depth = Int32
+newtype PerftTest = PerftTest (Gamestate, Depth) deriving (Show)
+
+checkBug :: PerftTest -> Bool
+checkBug (PerftTest (g, depth)) =
+  perft g depth /= reference_perft g depth
+
+
+counter = unsafePerformIO $ newIORef 0
+tickCounter = modifyIORef' counter (+1)
+
 newtype Gamestate = Gamestate BS.ByteString
-newtype Iterator = Iterator BS.ByteString
+newtype Iterator = Iterator BS.ByteString deriving (Show)
 newtype Move = Move BS.ByteString
+
+moves :: Gamestate -> [Move]
+moves g =
+  let loop i =
+        if isIteratorFinished i
+        then []
+        else
+          let m = dereferenceIterator i
+              i' = advanceIterator g i
+          in m : loop i'
+  in loop $ mkIterator g
+
+instance Show Gamestate where
+  show g = printFen g
+
+instance Show Move where
+  show m = printMove m
 
 pokeBs :: Ptr a -> BS.ByteString -> IO ()
 pokeBs ptr bs = BS.useAsCStringLen bs $ \(src, len) ->
@@ -47,6 +76,14 @@ newGame = unsafePerformIO $
   alloca $ \ptr -> do
     newGame_w ptr
     peek ptr
+
+printMove :: Move -> String
+printMove m = unsafePerformIO $
+  alloca $ \m_ptr ->
+  allocaBytes 10 $ \buffer -> do
+    poke m_ptr m
+    printMove_w m_ptr buffer
+    peekCString buffer
 
 printFen :: Gamestate -> String
 printFen g = unsafePerformIO $
@@ -85,6 +122,7 @@ applyMove g m = unsafePerformIO $
   alloca $ \g_ptr ->
   alloca $ \m_ptr ->
   alloca $ \g'_ptr -> do
+    tickCounter
     poke g_ptr g
     poke m_ptr m
     applyMove_w g_ptr m_ptr g'_ptr
@@ -104,6 +142,13 @@ dereferenceIterator i = unsafePerformIO $
     dereferenceIterator_w i_ptr m_ptr
     peek m_ptr
 
+timeTicks :: Show a => a -> IO Int
+timeTicks x = do
+  ticks <- readIORef counter
+  putStrLn $ show x
+  ticks' <- readIORef counter
+  return $ ticks' - ticks
+
 {- Standard output from the "roce38" process looks like:
 Roce version: 0.0380 - Roman's Own Chess Engine
 Copyright (C) 2003-2007 Roman Hartmann, Switzerland. All rights reserved.
@@ -114,6 +159,20 @@ roce:
 Perft (3): 8902, Time: 0.001 s
 roce: 
 -}
+runRoceCommands :: [String] -> ([String] -> a) -> IO a
+runRoceCommands commands parseOutput = do
+    (Just hin, Just hout, _, ph) <- createProcess $ (proc "./roce38" []) {
+      std_in = CreatePipe,
+      std_out = CreatePipe,
+      std_err = Inherit
+      }
+    hSetBuffering hout NoBuffering
+    hSetBuffering hin NoBuffering
+    forM_ commands $ \command -> do
+      hPutStr hin command
+      hPutChar hin '\n'
+    output <- hGetContents hout
+    return $ parseOutput $ drop 6 $ lines output
 
 reference_perft_w :: Gamestate -> Int32 -> IO Word64
 reference_perft_w g d =
@@ -122,30 +181,35 @@ reference_perft_w g d =
         "perft " ++ show d,
         "quit"
         ]
-  in do
-    (Just hin, Just hout, _, ph) <- createProcess $ CreateProcess {
-      cmdspec = RawCommand "./roce38" [],
-      cwd = Nothing, env = Nothing,
-      std_in = CreatePipe, std_out = CreatePipe, std_err = Inherit,
-      close_fds = False, create_group = False,
-      delegate_ctlc = False, detach_console = False,
-      create_new_console = False, new_session = False,
-      child_group = Nothing, child_user = Nothing
-      }
-    forM_ commands $ \command -> do
-      hPutStr hin command
-      hPutChar hin '\n'
-    waitForProcess ph
-    output <- hGetContents hout
-    let perft_line = lines output !! 6
-        perft_word = splitOneOf " ," perft_line !! 2
-        perft = read perft_word
-    return perft
+      parseOutput (perft_line : _) =
+        let perft_word = splitOneOf " ," perft_line !! 2
+            perft = read perft_word
+        in perft
+        
+  in runRoceCommands commands parseOutput
 
 reference_perft g d = unsafePerformIO $ reference_perft_w g d
 
+reference_moves_w :: Gamestate -> IO [String]
+reference_moves_w g =
+  let commands = [
+        "setboard " ++ printFen g,
+        "divide 1",
+        "quit"
+        ]
+      parseOutput lines =
+        let isEnd str = take 5 str == "Moves"
+            moveLines = takeWhile (not . isEnd) lines
+        in map (take 4) moveLines
+  in runRoceCommands commands parseOutput
+  
+reference_moves g = unsafePerformIO $ reference_moves_w g
+
 foreign import ccall unsafe "new_game_w"
     newGame_w :: Ptr Gamestate -> IO ()
+
+foreign import ccall unsafe "print_move_w"
+    printMove_w :: Ptr Move -> Ptr CChar -> IO ()
 
 foreign import ccall unsafe "print_fen_w"
     printFen_w :: Ptr Gamestate -> Ptr CChar -> IO ()
