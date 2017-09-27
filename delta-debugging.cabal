@@ -24,6 +24,7 @@ library
                      , process
                      , split
                      , contravariant
+                     , profunctors
   default-language:    Haskell2010
 
 executable test-perft

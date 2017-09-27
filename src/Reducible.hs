@@ -8,12 +8,19 @@ import Data.List (find)
 -- | "reduce" gives all of the single-step reductions for a type.
 -- | It is recommended to put the largest reductions first.
 class Reducible a where
-  reductions :: a -> [a]
+  reductions    :: a -> [a]
 
 minimize :: Reducible a => (a -> Bool) -> a -> a
 minimize f x = case find f $ reductions x of
   Nothing -> x
   Just y -> minimize f y
+
+minimize' :: Reducible a => (a -> Bool) -> a -> a
+minimize' f x = case reductions x of
+  [] -> x
+  xs -> case find f xs of
+    Nothing -> x
+    Just y -> minimize f y
 
 instance Reducible Gamestate where
   reductions g = map (applyMove g) $ moves g

@@ -17,6 +17,7 @@ import GHC.IO.Handle
 import System.IO.Unsafe
 import System.Process
 
+type Move' = String
 type Depth = Int32
 newtype PerftTest = PerftTest (Gamestate, Depth) deriving (Show)
 
@@ -77,7 +78,7 @@ newGame = unsafePerformIO $
     newGame_w ptr
     peek ptr
 
-printMove :: Move -> String
+printMove :: Move -> Move'
 printMove m = unsafePerformIO $
   alloca $ \m_ptr ->
   allocaBytes 10 $ \buffer -> do
@@ -122,7 +123,6 @@ applyMove g m = unsafePerformIO $
   alloca $ \g_ptr ->
   alloca $ \m_ptr ->
   alloca $ \g'_ptr -> do
-    tickCounter
     poke g_ptr g
     poke m_ptr m
     applyMove_w g_ptr m_ptr g'_ptr
@@ -172,6 +172,7 @@ runRoceCommands commands parseOutput = do
       hPutStr hin command
       hPutChar hin '\n'
     output <- hGetContents hout
+    tickCounter
     return $ parseOutput $ drop 6 $ lines output
 
 reference_perft_w :: Gamestate -> Int32 -> IO Word64
@@ -190,7 +191,7 @@ reference_perft_w g d =
 
 reference_perft g d = unsafePerformIO $ reference_perft_w g d
 
-reference_moves_w :: Gamestate -> IO [String]
+reference_moves_w :: Gamestate -> IO [Move']
 reference_moves_w g =
   let commands = [
         "setboard " ++ printFen g,
